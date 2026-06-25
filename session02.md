@@ -69,7 +69,7 @@ Los **delta specs** usan `## ADDED/MODIFIED/REMOVED Requirements` para indicar c
 En el chat del asistente IA:
 
 ```
-/opsx:propose fix-session-timeout
+  /opsx:propose fix-session-timeout
 ```
 
 **Salida esperada:**

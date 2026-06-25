@@ -50,13 +50,9 @@ router.post('/add', authenticate, async (req: AuthRequest, res: Response) => {
     });
 
     if (existingItem) {
-      // BUG: Adding as new item instead of updating quantity
-      await prisma.cartItem.create({
-        data: {
-          cartId: cart.id,
-          productId,
-          quantity // BUG: Should be existingItem.quantity + quantity
-        }
+      await prisma.cartItem.update({
+        where: { id: existingItem.id },
+        data: { quantity: existingItem.quantity + quantity }
       });
     } else {
       await prisma.cartItem.create({

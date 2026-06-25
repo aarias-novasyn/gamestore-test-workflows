@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -69,13 +70,18 @@ async function main() {
     prisma.product.deleteMany(),
   ]);
 
+  const hashedPasswords = await Promise.all([
+    bcrypt.hash('admin123', 10),
+    bcrypt.hash('pass123', 10),
+  ]);
+
   await prisma.user.createMany({
     data: [
-      { email: 'admin@gamestore.com', password: 'admin123', name: 'Admin User', role: 'admin' },
-      { email: 'user1@test.com', password: 'pass123', name: 'Test User 1', role: 'user' },
-      { email: 'user2@test.com', password: 'pass123', name: 'Test User 2', role: 'user' },
-      { email: 'user3@test.com', password: 'pass123', name: 'Test User 3', role: 'user' },
-      { email: 'user4@test.com', password: 'pass123', name: 'Test User 4', role: 'user' }
+      { email: 'admin@gamestore.com', password: hashedPasswords[0], name: 'Admin User', role: 'admin', lastActivity: new Date() },
+      { email: 'user1@test.com', password: hashedPasswords[1], name: 'Test User 1', role: 'user', lastActivity: new Date() },
+      { email: 'user2@test.com', password: hashedPasswords[1], name: 'Test User 2', role: 'user', lastActivity: new Date() },
+      { email: 'user3@test.com', password: hashedPasswords[1], name: 'Test User 3', role: 'user', lastActivity: new Date() },
+      { email: 'user4@test.com', password: hashedPasswords[1], name: 'Test User 4', role: 'user', lastActivity: new Date() }
     ]
   });
 

@@ -44,7 +44,7 @@ router.get('/', async (req, res) => {
     // BUG: N+1 query problem - fetches each product separately
      const products = await prisma.product.findMany({
        where,
-       skip: 0, // BUG: Always returns page 1 results
+       skip,
        take: limitNum,
        orderBy
      });

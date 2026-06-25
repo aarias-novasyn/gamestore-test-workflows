@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import { generateToken, generateRefreshToken, verifyRefreshToken, AuthRequest, authenticate } from '../middleware/auth';
 
 const router = Router();
@@ -14,13 +15,14 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Email already exists' });
     }
 
-    // BUG: Password stored in plain text
+    const hashedPassword = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
       data: {
         email,
-        password, // TODO: Store hashed password
+        password: hashedPassword,
         name,
-        role: 'user'
+        role: 'user',
+        lastActivity: new Date()
       }
     });
 
@@ -42,12 +44,14 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // BUG: Comparing plain text passwords directly
-    const user = await prisma.user.findFirst({
-      where: { email, password } // FIXME: Should compare with hashed password
-    });
+    const user = await prisma.user.findUnique({ where: { email } });
 
     if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const passwordValid = await bcrypt.compare(password, user.password);
+    if (!passwordValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -56,7 +60,7 @@ router.post('/login', async (req, res) => {
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { refreshToken }
+      data: { refreshToken, lastActivity: new Date() }
     });
 
     res.json({ token, refreshToken, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
@@ -74,7 +78,7 @@ router.post('/refresh', async (req, res) => {
     }
 
     const decoded = verifyRefreshToken(refreshToken);
-    
+
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId }
     });
@@ -83,11 +87,15 @@ router.post('/refresh', async (req, res) => {
       return res.status(401).json({ error: 'Invalid refresh token' });
     }
 
-    // BUG: Refresh token is not renewed, returning the same token
     const token = generateToken(user.id, user.role);
-    // FIXME: Should generate new refresh token and store it
-    
-    res.json({ token, refreshToken }); // BUG: Returning same refresh token instead of new one
+    const newRefreshToken = generateRefreshToken(user.id);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken: newRefreshToken, lastActivity: new Date() }
+    });
+
+    res.json({ token, refreshToken: newRefreshToken });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -110,7 +118,7 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
-      select: { id: true, email: true, name: true, role: true }
+      select: { id: true, email: true, name: true, role: true, lastActivity: true }
     });
 
     if (!user) {
